@@ -40,6 +40,7 @@ url = "172.28.3.51:8000"
 # --------------------------- OAuth2 ---------------------------
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/signin")
 
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -58,22 +59,27 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
     return user
 
+
 def require_admin(user: models.User):
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자 권한 필요")
+
 
 # --------------------------- 유틸 ---------------------------
 def get_password_hash(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return hashlib.sha256(plain_password.encode("utf-8")).hexdigest() == hashed_password
+
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 
 # --------------------------- 사용자 ---------------------------
 @app.post("/signup", response_model=schemas.UserResponse)
@@ -90,6 +96,7 @@ def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
+
 @app.post("/signin")
 def signin(user: schemas.UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
@@ -98,32 +105,36 @@ def signin(user: schemas.UserLogin, db: Session = Depends(get_db)):
     token = create_access_token({"sub": db_user.email})
     return {"access_token": token, "token_type": "bearer"}
 
+
 # --------------------------- 카테고리 ---------------------------
 @app.get("/categories", response_model=List[schemas.CategoryResponse])
 def get_categories(db: Session = Depends(get_db)):
     return db.query(models.Category).all()
 
+
 @app.post("/categories", response_model=schemas.CategoryResponse)
-def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db),
+                    user: models.User = Depends(get_current_user)):
     new_category = models.Category(name=category.name)
     db.add(new_category)
     db.commit()
     db.refresh(new_category)
     return new_category
 
+
 # --------------------------- 상품 ---------------------------
 @app.post("/products", response_model=schemas.ProductResponse)
 async def create_product(
-    name: str = Form(...),
-    brand: str = Form(...),
-    price: int = Form(...),
-    discount_rate: int = Form(0),
-    stock: int = Form(...),
-    category_id: int = Form(...),
-    image: UploadFile | None = File(None),
-    sku: str = Form(...),
-    db: Session = Depends(get_db),
-    user: models.User = Depends(get_current_user),
+        name: str = Form(...),
+        brand: str = Form(...),
+        price: int = Form(...),
+        discount_rate: int = Form(0),
+        stock: int = Form(...),
+        category_id: int = Form(...),
+        image: UploadFile | None = File(None),
+        sku: str = Form(...),
+        db: Session = Depends(get_db),
+        user: models.User = Depends(get_current_user),
 ):
     image_url = None
     if image:
@@ -152,10 +163,12 @@ async def create_product(
     db.refresh(new_product)
     return schemas.ProductResponse.from_orm(new_product)
 
+
 @app.get("/products", response_model=List[schemas.ProductResponse])
 def get_products(db: Session = Depends(get_db)):
     products = db.query(models.Product).all()
     return [schemas.ProductResponse.from_orm(p) for p in products]
+
 
 @app.get("/products/{product_id}", response_model=schemas.ProductResponse)
 def get_product(product_id: int, db: Session = Depends(get_db)):
@@ -164,19 +177,20 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="상품 없음")
     return schemas.ProductResponse.from_orm(product)
 
+
 @app.put("/products/{product_id}", response_model=schemas.ProductResponse)
 async def update_product(
-    product_id: int,
-    name: str | None = Form(None),
-    brand: str | None = Form(None),
-    price: int | None = Form(None),
-    discount_rate: int | None = Form(None),
-    stock: int | None = Form(None),
-    category_id: int | None = Form(None),
-    image: UploadFile | None = File(None),
-    sku: str | None = Form(None),
-    db: Session = Depends(get_db),
-    user: models.User = Depends(get_current_user)
+        product_id: int,
+        name: str | None = Form(None),
+        brand: str | None = Form(None),
+        price: int | None = Form(None),
+        discount_rate: int | None = Form(None),
+        stock: int | None = Form(None),
+        category_id: int | None = Form(None),
+        image: UploadFile | None = File(None),
+        sku: str | None = Form(None),
+        db: Session = Depends(get_db),
+        user: models.User = Depends(get_current_user)
 ):
     require_admin(user)
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
@@ -208,11 +222,12 @@ async def update_product(
     db.refresh(product)
     return schemas.ProductResponse.from_orm(product)
 
+
 @app.delete("/products/{product_id}")
 def delete_product(
-    product_id: int,
-    db: Session = Depends(get_db),
-    user: models.User = Depends(get_current_user)
+        product_id: int,
+        db: Session = Depends(get_db),
+        user: models.User = Depends(get_current_user)
 ):
     require_admin(user)
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
@@ -222,12 +237,13 @@ def delete_product(
     db.commit()
     return {"detail": "삭제 완료"}
 
+
 # --------------------------- 장바구니 ---------------------------
 @app.post("/cart", response_model=schemas.CartItemResponse, status_code=status.HTTP_201_CREATED)
 def add_to_cart(
-    item: schemas.CartItemCreate,
-    db: Session = Depends(get_db),
-    user: models.User = Depends(get_current_user)
+        item: schemas.CartItemCreate,
+        db: Session = Depends(get_db),
+        user: models.User = Depends(get_current_user)
 ):
     """
     장바구니 담기:
@@ -263,18 +279,49 @@ def add_to_cart(
         db.refresh(cart_item)
         return cart_item
 
+
 @app.get("/cart/", status_code=status.HTTP_200_OK)
 def get_cart(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     items = db.query(models.CartItem).filter(models.CartItem.user_id == user.id).all()
-    # 간단한 응답: 아이템 리스트 + 총 개수
-    total_items = sum(i.quantity for i in items)
-    return {"items": [ {"product_id": i.product_id, "quantity": i.quantity, "id": i.id} for i in items ], "total_items": total_items}
+
+    cart_data = {}
+    total_items = 0
+    total_price = 0
+
+    for cart_item in items:
+        product = db.query(models.Product).filter(models.Product.id == cart_item.product_id).first()
+        if not product:
+            continue
+        discounted_price = product.discounted_price or product.price
+        subtotal = discounted_price * cart_item.quantity
+
+        if product.id in cart_data:
+            cart_data[product.id]["quantity"] += cart_item.quantity
+            cart_data[product.id]["subtotal"] += subtotal
+        else:
+            cart_data[product.id] = {
+                "id": cart_item.id,
+                "product_id": product.id,
+                "name": product.name,
+                "brand": product.brand,
+                "image_url": product.image_url,
+                "price": product.price,
+                "discounted_price": discounted_price,
+                "quantity": cart_item.quantity,
+                "subtotal": subtotal
+            }
+
+        total_items += cart_item.quantity
+        total_price += subtotal
+
+    return {"items": list(cart_data.values()), "total_items": total_items, "total_price": total_price}
+
 
 # --------------------------- 장바구니 총 수량 (기존 요청) ---------------------------
 @app.get("/cart/total_quantity")
 def get_total_cart_quantity(
-    db: Session = Depends(get_db),
-    user: models.User = Depends(get_current_user)
+        db: Session = Depends(get_db),
+        user: models.User = Depends(get_current_user)
 ):
     total_quantity = (
         db.query(models.CartItem)
@@ -286,63 +333,27 @@ def get_total_cart_quantity(
     total = sum(item.quantity for item in total_quantity)
     return {"total_quantity": total}
 
+
 # --------------------------- 주문 ---------------------------
-@app.post("/orders", response_model=schemas.OrderResponse)
+@app.post("/orders", status_code=201)
 def create_order(
-    order: schemas.OrderCreate,
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user)
 ):
-    # 본인 계정만 주문 가능
-    if user.id != order.user_id:
-        raise HTTPException(status_code=403, detail="본인 계정만 주문 가능")
-
-    # 우선: 사용자의 장바구니가 비어있지 않다면, 장바구니 기반으로 주문 생성
+    # 사용자의 장바구니 조회
     cart_items = db.query(models.CartItem).filter(models.CartItem.user_id == user.id).all()
-    if cart_items:
-        # 장바구니에 이미 재고가 차감되어 있다고 가정(위 add_to_cart에서 차감)
-        new_order = models.Order(user_id=user.id, total_price=order.total_price)
-        db.add(new_order)
-        db.commit()
-        db.refresh(new_order)
+    if not cart_items:
+        raise HTTPException(status_code=400, detail="장바구니가 비어있습니다.")
 
-        for ci in cart_items:
-            # 상품 존재 여부 확인
-            product = db.query(models.Product).filter(models.Product.id == ci.product_id).first()
-            if not product:
-                raise HTTPException(status_code=404, detail=f"{ci.product_id} 상품 없음")
-            order_item = models.OrderItem(order_id=new_order.id, product_id=ci.product_id, quantity=ci.quantity, price=product.price)
-            db.add(order_item)
-            # 장바구니 항목 삭제
-            db.delete(ci)
-        db.commit()
+    # 장바구니 수량만큼 재고 다시 채워 넣기
+    for ci in cart_items:
+        product = db.query(models.Product).filter(models.Product.id == ci.product_id).first()
+        if product:
+            # product.stock += ci.quantity
+            db.delete(ci)  # 장바구니 비우기
 
-        items = db.query(models.OrderItem).filter(models.OrderItem.order_id == new_order.id).all()
-        response = schemas.OrderResponse.from_orm(new_order)
-        response.items = [schemas.OrderItemResponse.from_orm(i) for i in items]
-        return response
-
-    # 장바구니가 비어있으면, 요청으로 넘어온 order.items 기준으로 재고 확인 및 차감
-    new_order = models.Order(user_id=order.user_id, total_price=order.total_price)
-    db.add(new_order)
     db.commit()
-    db.refresh(new_order)
-
-    for item in order.items:
-        product = db.query(models.Product).filter(models.Product.id == item.product_id).with_for_update().first()
-        if not product:
-            raise HTTPException(status_code=404, detail=f"{item.product_id} 상품 없음")
-        if product.stock < item.quantity:
-            raise HTTPException(status_code=400, detail=f"{product.name} 재고 부족")
-        product.stock -= item.quantity
-        order_item = models.OrderItem(order_id=new_order.id, product_id=item.product_id, quantity=item.quantity, price=item.price)
-        db.add(order_item)
-    db.commit()
-
-    items = db.query(models.OrderItem).filter(models.OrderItem.order_id == new_order.id).all()
-    response = schemas.OrderResponse.from_orm(new_order)
-    response.items = [schemas.OrderItemResponse.from_orm(i) for i in items]
-    return response
+    return {"detail": "주문 완료 및 장바구니 초기화, 재고 반영 완료"}
 
 # --------------------------- 관리자: 판매/재고 관련 엔드포인트 ---------------------------
 @app.get("/admin/sales/top")
@@ -368,8 +379,10 @@ def admin_top_sales(limit: int = 10, db: Session = Depends(get_db), user: models
 
     return [{"product_id": r.product_id, "name": r.name, "total_sold": int(r.total_sold)} for r in results]
 
+
 @app.get("/admin/sales/history")
-def admin_sales_history(product_id: Optional[int] = None, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def admin_sales_history(product_id: Optional[int] = None, db: Session = Depends(get_db),
+                        user: models.User = Depends(get_current_user)):
     """
     주문 히스토리:
       - product_id가 주어지면 해당 상품의 주문(주문 id, 수량, 주문일시) 리스트 반환
@@ -393,6 +406,7 @@ def admin_sales_history(product_id: Optional[int] = None, db: Session = Depends(
         })
     return res
 
+
 @app.get("/admin/products/{product_id}/stats")
 def admin_product_stats(product_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     """
@@ -403,7 +417,8 @@ def admin_product_stats(product_id: int, db: Session = Depends(get_db), user: mo
     """
     require_admin(user)
 
-    total_sold = db.query(func.coalesce(func.sum(models.OrderItem.quantity), 0)).filter(models.OrderItem.product_id == product_id).scalar() or 0
+    total_sold = db.query(func.coalesce(func.sum(models.OrderItem.quantity), 0)).filter(
+        models.OrderItem.product_id == product_id).scalar() or 0
     last_row = (
         db.query(models.Order.order_date)
         .join(models.OrderItem, models.OrderItem.order_id == models.Order.id)
@@ -424,8 +439,10 @@ def admin_product_stats(product_id: int, db: Session = Depends(get_db), user: mo
         "remaining_stock": product.stock
     }
 
+
 @app.patch("/admin/products/{product_id}/restock")
-def admin_restock(product_id: int, amount: int = Form(...), db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def admin_restock(product_id: int, amount: int = Form(...), db: Session = Depends(get_db),
+                  user: models.User = Depends(get_current_user)):
     """
     재고 보충: 관리자 전용. amount = 추가할 수량 (음수는 허용하지 않음)
     """

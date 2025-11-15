@@ -37,7 +37,6 @@ class ProductBase(BaseModel):
     brand: str
     price: int
     discount_rate: int = 0
-    discounted_price: int | None = None
     stock: int
     image_url: str | None = None
     category_id: int
